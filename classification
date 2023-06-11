@@ -1,0 +1,108 @@
+//Setting up the work area
+2	
+3	Map.setCenter(18.8, 50.3, 10); // Center the map on the work area
+4	
+5	var GZMRectangle= ee.Geometry.Rectangle([18.25, 49.95, 19.65, 50.55]); // Set work area as krakow using a rectangle
+6	
+7	//Adding the Boundaries_GZM asset extracted with QGIS from the counties of Poland to the work.
+8	var GZMBoundaries = ee.FeatureCollection("users/tymoteuszmaj/GZM");
+9	
+10	//Determining the year for which we perform the analysis
+11	
+12	var analysisYear = 2020;
+13	var startDate = ee.Date.fromYMD(analysisYear, 1, 1);
+14	var endDate = ee.Date.fromYMD(analysisYear, 12, 31);
+15	
+16	// Download LANDSAT/LC08/C01/T1_TOA data
+17	var landsatCollection = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+18	    .filterBounds(GZMRectangle)
+19	    .filterDate(startDate, endDate) //Analysis in terms of narrowing the period to one year
+20	    .sort("CLOUD_COVER", true) //Analysis in terms of least cloud cover
+21	    .limit(20); //limit set at 20 photos that have the least cloud cover
+22	    
+23	var medianImage = landsatCollection.median(); // Select the median image from the collection
+24	
+25	//Trim LANDSAT images to the area of the city of Krakow, using an asset
+26	var landsatImage = medianImage.clip(GZMBoundaries);
+27	
+28	// RGB image
+29	var rgbImage = landsatImage.select(['B4', 'B3', 'B2']); // Create RGB image using red, green, and blue bands
+30	//Map.addLayer(rgbImage, {min: 0, max: 0.3}, 'RGB Image'); // Display the RGB image on the map
+31	
+32	// Wczytaj warstwy jako obiekty FeatureCollection
+33	var buildings = ee.FeatureCollection('users/tymoteuszmaj/GZM_Buildings');
+34	var farmlands = ee.FeatureCollection('users/tymoteuszmaj/GZM_Farmlands');
+35	var forest = ee.FeatureCollection('users/tymoteuszmaj/GZM_Forest');
+36	var water = ee.FeatureCollection('users/tymoteuszmaj/GZM_Water');
+37	
+tymoteuszmaj.gee	3e0fe64	2023-06-09 20:42:32 +0000	[diff] [blame]	38	// Wczytaj obraz terenu, który chcesz sklasyfikować
+39	var terrainImage = landsatImage.select('B4', 'B3', 'B2'); // Przykładowe pasma obrazu Landsat (zmień według potrzeb)
+40	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	41	// Przekształć warstwy GZM na obrazy maski dla poszczególnych klas
+42	var buildingMask = buildings.reduceToImage({
+43	  properties: ['class'],
+44	  reducer: ee.Reducer.first()
+45	}).unmask();
+tymoteuszmaj.gee	3e0fe64	2023-06-09 20:42:32 +0000	[diff] [blame]	46	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	47	var farmlandMask = farmlands.reduceToImage({
+48	  properties: ['class'],
+49	  reducer: ee.Reducer.first()
+50	}).unmask();
+tymoteuszmaj.gee	3e0fe64	2023-06-09 20:42:32 +0000	[diff] [blame]	51	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	52	var forestMask = forest.reduceToImage({
+53	  properties: ['class'],
+54	  reducer: ee.Reducer.first()
+55	}).unmask();
+tymoteuszmaj.gee	931310d	2023-06-09 20:47:11 +0000	[diff] [blame]	56	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	57	var waterMask = water.reduceToImage({
+58	  properties: ['class'],
+59	  reducer: ee.Reducer.first()
+60	}).unmask();
+61	
+62	// Sklasyfikuj teren z wykorzystaniem odpowiednich masek dla poszczególnych klas
+63	var classifiedBuilding = terrainImage.updateMask(buildingMask);
+64	var classifiedFarmland = terrainImage.updateMask(farmlandMask);
+65	var classifiedForest = terrainImage.updateMask(forestMask);
+66	var classifiedWater = terrainImage.updateMask(waterMask);
+67	
+68	// Spójrzmy teraz na przykład na klasę 'Building'
+69	var flattenedBuilding = classifiedBuilding.reduce(ee.Reducer.first());
+70	
+71	// Wizualizacja sklasyfikowanej klasy 'Building'
+72	var buildingVisParams = {
+tymoteuszmaj.gee	931310d	2023-06-09 20:47:11 +0000	[diff] [blame]	73	  min: 0,
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	74	  max: 1,
+75	  palette: ['white', 'red']
+tymoteuszmaj.gee	931310d	2023-06-09 20:47:11 +0000	[diff] [blame]	76	};
+77	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	78	// Wyświetl spłaszczony obraz klasy 'Building'
+79	Map.addLayer(flattenedBuilding, buildingVisParams, 'Sklasyfikowane budynki');
+tymoteuszmaj.gee	931310d	2023-06-09 20:47:11 +0000	[diff] [blame]	80	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	81	// Możesz teraz powtórzyć te kroki dla pozostałych klas (farmland, forest, water)
+tymoteuszmaj.gee	931310d	2023-06-09 20:47:11 +0000	[diff] [blame]	82	
+tymoteuszmaj.gee	c1a0722	2023-06-09 20:56:11 +0000	[diff] [blame]	83	// Podobnie dla klasy 'Farmland'
+84	var flattenedFarmland = classifiedFarmland.reduce(ee.Reducer.first());
+85	var farmlandVisParams = {
+86	  min: 0,
+87	  max: 1,
+88	  palette: ['white', 'green']
+89	};
+90	Map.addLayer(flattenedFarmland, farmlandVisParams, 'Sklasyfikowane pola uprawne');
+91	
+92	// Podobnie dla klasy 'Forest'
+93	var flattenedForest = classifiedForest.reduce(ee.Reducer.first());
+94	var forestVisParams = {
+95	  min: 0,
+96	  max: 1,
+97	  palette: ['white', 'darkgreen']
+98	};
+99	Map.addLayer(flattenedForest, forestVisParams, 'Sklasyfikowany las');
+100	
+101	// Podobnie dla klasy 'Water'
+102	var flattenedWater = classifiedWater.reduce(ee.Reducer.first());
+103	var waterVisParams = {
+104	  min: 0,
+105	  max: 1,
+106	  palette: ['white', 'blue']
+107	};
+108	Map.addLayer(flattenedWater, waterVisParams, 'Sklasyfikowana woda');

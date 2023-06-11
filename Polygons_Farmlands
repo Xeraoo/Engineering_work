@@ -1,0 +1,128 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var Farmlands = /* color: #fffd17 */ee.Geometry.MultiPolygon(
+        [[[[19.086302369487985, 50.44937238352652],
+           [19.078749268902047, 50.44980960975831],
+           [19.078234284771188, 50.4447812641608],
+           [19.067762940777047, 50.446311686776546],
+           [19.067247956646188, 50.44456262831819],
+           [19.078234284771188, 50.440627010423846],
+           [19.084757417095407, 50.437347078840794],
+           [19.08544406260322, 50.44215756738304],
+           [19.089735597027047, 50.44882584505519]]],
+         [[[19.13659915293525, 50.448935153254496],
+           [19.142950623882516, 50.445109216030794],
+           [19.148272126568063, 50.44040835538921],
+           [19.152906983745797, 50.432645447215826],
+           [19.15960177744697, 50.42881819303229],
+           [19.17178973521064, 50.42706848807986],
+           [19.169214814556344, 50.440517683032766],
+           [19.160460084331735, 50.44751412696734],
+           [19.148958772075876, 50.45112126421231],
+           [19.130934327495797, 50.452760781146104]]],
+         [[[19.249986388920668, 50.41404300051645],
+           [19.254792907475355, 50.41677763804265],
+           [19.257539489506605, 50.42235580911774],
+           [19.257539489506605, 50.42519932979188],
+           [19.240545013188246, 50.43077650906939],
+           [19.234365203617934, 50.43110455798212],
+           [19.236081817387465, 50.423996322650424],
+           [19.234365203617934, 50.420715238758795]]],
+         [[[19.253494242526536, 50.437271917512206],
+           [19.263793925143723, 50.43546785539838],
+           [19.267312983371262, 50.43289831490647],
+           [19.27538106808806, 50.43322634911788],
+           [19.286281565524583, 50.434155767040615],
+           [19.28885648617888, 50.436561234583905],
+           [19.284650782443528, 50.43973189141294],
+           [19.268514613009934, 50.438857248672946],
+           [19.25684163937712, 50.44066118161541]]],
+         [[[19.26439473996306, 50.44886001032715],
+           [19.258815745212083, 50.44328496134779],
+           [19.278213480807786, 50.44268369133979],
+           [19.278900126315598, 50.44601791056381],
+           [19.278213480807786, 50.448422775320495],
+           [19.27134702572966, 50.447056389883876]]],
+         [[[19.130033059644525, 50.39996586195575],
+           [19.142049356031244, 50.39520580256454],
+           [19.155267282056634, 50.39755853533752],
+           [19.163249536084955, 50.399418753005286],
+           [19.172175927686517, 50.40034883446363],
+           [19.18062500792473, 50.402590164751544],
+           [19.189122246083908, 50.40724007839128],
+           [19.186375664052658, 50.41167074803069],
+           [19.17933754759758, 50.41440552248973],
+           [19.17659096556633, 50.418452698987075],
+           [19.17006783324211, 50.41528061697665],
+           [19.16337303954094, 50.41090498289341],
+           [19.15787987547844, 50.40625542887487],
+           [19.14964012938469, 50.40330135756729],
+           [19.13942627745598, 50.40100361924351]]],
+         [[[19.19526894974185, 50.178705396542114],
+           [19.19046243118716, 50.16930536104991],
+           [19.20616944717837, 50.16446719515557],
+           [19.22041734146548, 50.16039835837231],
+           [19.221533140415676, 50.162267866929604],
+           [19.21870072769595, 50.16452217706464],
+           [19.214065870518215, 50.16683136013497],
+           [19.20719941544009, 50.1725488571042],
+           [19.199646314854153, 50.17700143377647]]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//Tymoteusz Maj
+//Informatyka Geoprzestrzenna (Geoinformacja)
+//Praca inżynierska
+
+//Setting up the work area
+
+Map.setCenter(18.8, 50.3, 10); // Center the map on the work area
+
+var GZMRectangle= ee.Geometry.Rectangle([18.25, 49.95, 19.65, 50.55]); // Set work area as krakow using a rectangle
+
+Map.addLayer(ee.Image().paint(GZMRectangle, 0, 2), {}, 'GZM Rectangle'); // Add the work area to the map
+
+//The square showing the krakow area, is used to properly narrow down the work area so that it 
+//is in the area where LANDSAT images are downloaded, making the work faster.
+
+
+//Adding the Boundaries_GZM asset extracted with QGIS from the counties of Poland to the work.
+var GZMBoundaries = ee.FeatureCollection("users/tymoteuszmaj/GZM");
+Map.addLayer(GZMBoundaries, {}, 'Boundaries');
+
+//Determining the year for which we perform the analysis
+
+var analysisYear = 2020;
+var startDate = ee.Date.fromYMD(analysisYear, 3, 1);
+var endDate = ee.Date.fromYMD(analysisYear, 9, 30);
+
+// Download LANDSAT/LC08/C01/T1_TOA data
+var landsatCollection = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+    .filterBounds(GZMRectangle)
+    .filterDate(startDate, endDate) //Analysis in terms of narrowing the period to one year
+    .sort("CLOUD_COVER", true) //Analysis in terms of least cloud cover
+    .limit(20); //limit set at 20 photos that have the least cloud cover
+    
+var medianImage = landsatCollection.median(); // Select the median image from the collection
+
+
+//Trim LANDSAT images to the area of the city of Krakow, using an asset
+var landsatImage = medianImage.clip(GZMBoundaries);
+
+
+// RGB image
+var rgbImage = landsatImage.select(['B4', 'B3', 'B2']); // Create RGB image using red, green, and blue bands
+Map.addLayer(rgbImage, {min: 0, max: 0.3}, 'RGB Image'); // Display the RGB image on the map
+
+
+// Eksportowanie warstwy do assetu
+
+// Tworzenie kolekcji obiektów typu FeatureCollection
+var farmlandsCollection = ee.FeatureCollection([Farmlands]);
+
+// Definiowanie nazwy i ścieżki docelowego assetu
+var GZM_Farmlands = 'GZM_Farmlands';
+
+// Eksportowanie warstwy "Farmlands" do assetu
+Export.table.toAsset({
+  collection: farmlandsCollection, // Warstwa do eksportu
+  description: 'Farmlands_Export', // Opis eksportu
+  assetId: GZM_Farmlands // Identyfikator docelowego assetu
+});
